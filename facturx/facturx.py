@@ -41,7 +41,6 @@ from pkg_resources import resource_filename
 import os.path
 import mimetypes
 import hashlib
-import logging
 import sys
 if sys.version_info[0] == 3:
     unicode = str
@@ -50,9 +49,6 @@ if sys.version_info[0] == 3:
 
 
 FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
-logging.basicConfig(format=FORMAT)
-logger = logging.getLogger('factur-x')
-logger.setLevel(logging.INFO)
 
 FACTURX_FILENAME = 'factur-x.xml'
 ZUGFERD_FILENAMES = ['zugferd-invoice.xml', 'ZUGFeRD-invoice.xml']
@@ -87,10 +83,7 @@ XML_AFRelationship = ('data', 'source', 'alternative')
 ATTACHMENTS_AFRelationship = ('supplement', 'unspecified')
 
 
-def check_facturx_xsd(
-        facturx_xml, flavor='autodetect', facturx_level='autodetect'):
-    logger.warning(
-        'check_facturx_xsd() is deprecated. Use xml_check_xsd() instead.')
+def check_facturx_xsd(facturx_xml, flavor='autodetect', facturx_level='autodetect'):
     return xml_check_xsd(facturx_xml, flavor=flavor, level=facturx_level)
 
 
@@ -110,8 +103,6 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
     :return: True if the XML is valid against the XSD
     raise an error if it is not valid against the XSD
     """
-    logger.debug(
-        'xml_check_xsd with factur-x lib %s', __version__)
     if not xml:
         raise ValueError('Missing xml argument')
     if not isinstance(flavor, (str, unicode)):
@@ -174,18 +165,13 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
         xsd_file = resource_filename(
             __name__, 'xsd/%s' % ORDERX_LEVEL2xsd[level])
 
-    logger.debug('Using XSD file %s', xsd_file)
     xsd_etree_obj = etree.parse(open(xsd_file))
     official_schema = etree.XMLSchema(xsd_etree_obj)
     try:
         t = etree.parse(BytesIO(xml_bytes))
         official_schema.assertValid(t)
-        logger.info('%s XML file successfully validated against XSD', flavor)
     except Exception as e:
         # if the validation of the XSD fails, we arrive here
-        logger.error(
-            "The XML file is invalid against the XML Schema Definition")
-        logger.error('XSD Error: %s', e)
         raise Exception(
             "The %s XML file is not valid against the official "
             "XML Schema Definition. "
@@ -214,36 +200,22 @@ def _parse_embeddedfiles_kids_node(kids_node, level, res):
     if level not in [1, 2]:
         raise ValueError('Level argument should be 1 or 2')
     if not isinstance(kids_node, list):
-        logger.error(
-            'The /Kids entry of the EmbeddedFiles name tree must '
-            'be an array')
         return False
-    logger.debug("kids_node=%s", kids_node)
     for kid_entry in kids_node:
         if not isinstance(kid_entry, IndirectObject):
-            logger.error(
-                'The /Kids entry of the EmbeddedFiles name tree '
-                'must be a list of IndirectObjects')
+
             return False
         kids_node = kid_entry.getObject()
-        logger.debug('kids_node=%s', kids_node)
         if not isinstance(kids_node, dict):
-            logger.error(
-                'The /Kids entry of the EmbeddedFiles name tree '
-                'must be a list of IndirectObjects that point to '
-                'dict objects')
             return False
         if '/Names' in kids_node:
             if not isinstance(kids_node['/Names'], list):
-                logger.error(
-                    'The /Names entry in EmbeddedFiles must be an array')
                 return False
             res += kids_node['/Names']
         elif '/Kids' in kids_node and level == 1:
             kids_node_l2 = kids_node['/Kids']
             _parse_embeddedfiles_kids_node(kids_node_l2, 2, res)
         else:
-            logger.error('/Kids node should have a /Names or /Kids entry')
             return False
     return True
 
@@ -254,9 +226,6 @@ def _get_embeddedfiles(embeddedfiles_node):
     res = []
     if '/Names' in embeddedfiles_node:
         if not isinstance(embeddedfiles_node['/Names'], list):
-            logger.error(
-                'The /Names entry of the EmbeddedFiles name tree must '
-                'be an array')
             return False
         res = embeddedfiles_node['/Names']
     elif '/Kids' in embeddedfiles_node:
@@ -265,14 +234,8 @@ def _get_embeddedfiles(embeddedfiles_node):
         if parse_result is False:
             return False
     else:
-        logger.error(
-            'The EmbeddedFiles name tree should have either a /Names '
-            'or a /Kids entry')
         return False
     if len(res) % 2 != 0:
-        logger.error(
-            'The EmbeddedFiles name tree should point to an even number of '
-            'elements')
         return False
     return res
 
@@ -288,8 +251,6 @@ def get_orderx_xml_from_pdf(pdf_file, check_xsd=True):
 
 
 def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
-    logger.debug(
-        'get_xml_from_pdf with factur-x lib %s', __version__)
     if not pdf_file:
         raise ValueError('Missing pdf_invoice argument')
     if not isinstance(check_xsd, bool):
@@ -306,36 +267,25 @@ def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
             "be either a byte or a file (it is a %s)." % type(pdf_file))
     if not filenames:
         filenames = ALL_FILENAMES
-    logger.debug('Searching for filenames %s', filenames)
     xml_bytes = xml_filename = False
     pdf = PdfFileReader(pdf_file_in)
     pdf_root = pdf.trailer['/Root']  # = Catalog
-    logger.debug('pdf_root=%s', pdf_root)
     catalog_name = _get_dict_entry(pdf_root, '/Names')
     if not catalog_name:
-        logger.info('No Names entry in Catalog')
         return (None, None)
     embeddedfiles_node = _get_dict_entry(catalog_name, '/EmbeddedFiles')
     if not embeddedfiles_node:
-        logger.info('No EmbeddedFiles entry in the /Names of the Catalog')
         return (None, None)
     embeddedfiles = _get_embeddedfiles(embeddedfiles_node)
-    logger.debug('embeddedfiles=%s', embeddedfiles)
     if not embeddedfiles:
         return (None, None)
     embeddedfiles_by_two = list(zip(embeddedfiles, embeddedfiles[1:]))[::2]
-    logger.debug('embeddedfiles_by_two=%s', embeddedfiles_by_two)
     try:
         for (filename, file_obj) in embeddedfiles_by_two:
-            logger.debug('found filename=%s', filename)
             if filename in filenames:
                 xml_file_dict = file_obj.getObject()
-                logger.debug('xml_file_dict=%s', xml_file_dict)
                 tmp_xml_bytes = xml_file_dict['/EF']['/F'].getData()
                 xml_root = etree.fromstring(tmp_xml_bytes)
-                logger.info(
-                    'A valid XML file %s has been found in the PDF file',
-                    filename)
                 if check_xsd:
                     flavor = 'autodetect'
                     if filename == ORDERX_FILENAME:
@@ -352,10 +302,7 @@ def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
                     xml_filename = filename
                 break
     except Exception as e:
-        logger.error('No valid XML file found in the PDF: %s', e)
         return (None, None)
-    logger.info('Returning an XML file %s', xml_filename)
-    logger.debug('Content of the XML file: %s', xml_bytes)
     return (xml_filename, xml_bytes)
 
 
@@ -495,8 +442,6 @@ def _prepare_pdf_metadata_xml(flavor, level, orderx_type, pdf_metadata):
         version='1.0',
         xmp_level=xmp_level)
     xml_byte = xml_str.encode('utf-8')
-    logger.debug('metadata XML:')
-    logger.debug(xml_byte)
     return xml_byte
 
 
@@ -508,7 +453,6 @@ def _prepare_pdf_metadata_xml(flavor, level, orderx_type, pdf_metadata):
 
 def _filespec_additional_attachments(
         pdf_filestream, name_arrayobj_cdict, file_dict, filename):
-    logger.debug('_filespec_additional_attachments filename=%s', filename)
     md5sum = hashlib.md5(file_dict['filedata']).hexdigest()
     md5sum_obj = createStringObject(md5sum)
     params_dict = DictionaryObject({
@@ -615,10 +559,8 @@ def _facturx_update_metadata_add_attachment(
     for attach_filename, attach_dict in additional_attachments.items():
         _filespec_additional_attachments(
             pdf_filestream, name_arrayobj_cdict, attach_dict, attach_filename)
-    logger.debug('name_arrayobj_cdict=%s', name_arrayobj_cdict)
     name_arrayobj_content_sort = list(
         sorted(name_arrayobj_cdict.items(), key=lambda x: x[0]))
-    logger.debug('name_arrayobj_content_sort=%s', name_arrayobj_content_sort)
     name_arrayobj_content_final = []
     af_list = []
     for (fname_obj, filespec_obj) in name_arrayobj_content_sort:
@@ -633,7 +575,6 @@ def _facturx_update_metadata_add_attachment(
         NameObject("/EmbeddedFiles"): embedded_files_names_dict,
         })
     res_output_intents = []
-    logger.debug('output_intents=%s', output_intents)
     for output_intent_dict, dest_output_profile_dict in output_intents:
         dest_output_profile_obj = pdf_filestream._addObject(
             dest_output_profile_dict)
@@ -667,14 +608,12 @@ def _facturx_update_metadata_add_attachment(
         pdf_filestream._root_object.update({
             NameObject("/Lang"): createStringObject(lang.replace('_', '-')),
             })
-    logger.debug('res_output_intents=%s', res_output_intents)
     if res_output_intents:
         pdf_filestream._root_object.update({
             NameObject("/OutputIntents"): ArrayObject(res_output_intents),
         })
     metadata_txt_dict = _prepare_pdf_metadata_txt(pdf_metadata)
     pdf_filestream.addMetadata(metadata_txt_dict)
-    logger.info('%s file added to PDF document', xml_filename)
 
 
 def _extract_base_info(facturx_xml_etree):
@@ -711,7 +650,6 @@ def _extract_base_info(facturx_xml_etree):
         'date': date_dt,
         'doc_type': doc_type,
         }
-    logger.debug('Extraction of base_info: %s', base_info)
     return base_info
 
 
@@ -752,7 +690,6 @@ def _base_info2pdf_metadata(base_info):
         'title': title,
         'subject': subject,
         }
-    logger.debug('Converted base_info to pdf_metadata: %s', pdf_metadata)
     return pdf_metadata
 
 
@@ -782,20 +719,16 @@ def get_level(xml_etree):
     if level not in possible_values:
         raise ValueError(
             "Invalid Factur-X/Order-X URN: '%s'" % doc_id)
-    logger.info('Level is %s (autodetected)', level)
     return level
 
 
 def get_facturx_flavor(facturx_xml_etree):
-    logger.warning(
-        'get_facturx_flavor() is deprecated. Use get_flavor() instead.')
     return get_flavor(facturx_xml_etree)
 
 
 def get_flavor(xml_etree):
     if not isinstance(xml_etree, type(etree.Element('pouet'))):
         raise ValueError('xml_etree must be an etree.Element() object')
-    logger.debug('First XML tag: %s', xml_etree.tag)
     if xml_etree.tag.endswith('CrossIndustryInvoice'):
         flavor = 'factur-x'
     elif xml_etree.tag.endswith('CrossIndustryDocument'):
@@ -806,7 +739,6 @@ def get_flavor(xml_etree):
         raise Exception(
             "Could not detect if the document is a Factur-X, ZUGFeRD 1.0 "
             "or Order-X document.")
-    logger.info('Flavor is %s (autodetected)', flavor)
     return flavor
 
 
@@ -822,8 +754,6 @@ def get_orderx_type(xml_etree):
         raise Exception(
             "The TypeCode extracted from the XML is %s. "
             "This is not a valid Order-X TypeCode." % code)
-    logger.info(
-        'Order-X type is %s code %s (autodetected)', ORDERX_code2type[code], code)
     return ORDERX_code2type[code]
 
 
@@ -832,10 +762,8 @@ def _get_original_output_intents(original_pdf):
     try:
         pdf_root = original_pdf.trailer['/Root']
         ori_output_intents = pdf_root['/OutputIntents']
-        logger.debug('output_intents_list=%s', ori_output_intents)
         for ori_output_intent in ori_output_intents:
             ori_output_intent_dict = ori_output_intent.getObject()
-            logger.debug('ori_output_intents_dict=%s', ori_output_intent_dict)
             dest_output_profile_dict =\
                 ori_output_intent_dict['/DestOutputProfile'].getObject()
             output_intents.append(
@@ -848,9 +776,6 @@ def _get_original_output_intents(original_pdf):
 def generate_facturx_from_binary(
         pdf_file, xml, facturx_level='autodetect',
         check_xsd=True, pdf_metadata=None, lang=None, attachments=None):
-    logger.warning(
-        'generate_facturx_from_binary() is deprecated. '
-        'Use generate_from_binary() instead.')
     return generate_from_binary(
         pdf_file, xml, flavor='factur-x', level=facturx_level,
         check_xsd=check_xsd, pdf_metadata=pdf_metadata, lang=lang,
@@ -946,13 +871,7 @@ def generate_facturx_from_file(
         pdf_file, facturx_xml, facturx_level='autodetect',
         check_xsd=True, pdf_metadata=None, output_pdf_file=None,
         additional_attachments=None, attachments=None, lang=None):
-    logger.warning(
-        'generate_facturx_from_file() is deprecated. '
-        'Use generate_from_file() instead.')
-    if additional_attachments:
-        logger.warning(
-            "The argument additional_attachments is not supported "
-            "any more. Use the attachments arg instead.")
+
     return generate_from_file(
         pdf_file, facturx_xml, flavor='factur-x', level=facturx_level,
         check_xsd=check_xsd, pdf_metadata=pdf_metadata,
@@ -1032,19 +951,6 @@ def generate_from_file(
     :rtype: bool
     """
     start_chrono = datetime.now()
-    logger.debug(
-        'generate_from_file with factur-x lib %s', __version__)
-    logger.debug('1st arg pdf_file type=%s', type(pdf_file))
-    logger.debug('2nd arg xml type=%s', type(xml))
-    logger.debug('optional arg flavor=%s', flavor)
-    logger.debug('optional arg level=%s', level)
-    logger.debug('optional arg orderx_type=%s', orderx_type)
-    logger.debug('optional arg check_xsd=%s', check_xsd)
-    logger.debug('optional arg pdf_metadata=%s', pdf_metadata)
-    logger.debug('optional arg lang=%s', lang)
-    logger.debug('optional arg output_pdf_file=%s', output_pdf_file)
-    logger.debug('optional arg attachments=%s', attachments)
-    logger.debug('optional arg afrelationship=%s', afrelationship)
     if not pdf_file:
         raise ValueError('Missing pdf_file argument')
     if not xml:
@@ -1093,9 +999,7 @@ def generate_from_file(
     else:
         afrelationship = 'data'
     if afrelationship not in XML_AFRelationship:
-        logger.warning(
-            "Wrong value for afrelationship (%s). Forcing it to 'data'.",
-            afrelationship)
+
         afrelationship = 'data'
 
     if isinstance(pdf_file, (str, unicode)):
@@ -1130,9 +1034,7 @@ def generate_from_file(
         # Error: dictionary changed size during iteration
         for filename in list(attachments.keys()):
             if filename in ALL_FILENAMES:
-                logger.warning(
-                    'You cannot provide as attachment a file named %s. '
-                    'This file will NOT be attached.', filename)
+
                 attachments.pop(filename)
         for fadict in attachments.values():
             if fadict.get('filepath') and not fadict.get('filedata'):
@@ -1157,22 +1059,18 @@ def generate_from_file(
     if flavor not in ('factur-x', 'order-x'):
         if xml_root is None:
             xml_root = etree.fromstring(xml_bytes)
-        logger.debug('Flavor will be autodetected')
         flavor = get_flavor(xml_root)
     if (
             (flavor == 'factur-x' and level not in FACTURX_LEVEL2xsd) or
             (flavor == 'order-x' and level not in ORDERX_LEVEL2xsd)):
         if xml_root is None:
             xml_root = etree.fromstring(xml_bytes)
-        logger.debug('level will be autodetected')
         level = get_level(xml_root)
     if (
             flavor == 'factur-x' and
             level in ('minimum', 'basicwl') and
             afrelationship in ('source', 'alternative')):
-        logger.warning(
-            "afrelationship switched from '%s' to 'data' because it must be 'data' "
-            "for Factur-X profile '%s'.", afrelationship, level)
+
         afrelationship = 'data'
     if flavor == 'order-x' and orderx_type not in ORDERX_TYPES:
         if xml_root is None:
@@ -1199,7 +1097,6 @@ def generate_from_file(
     new_pdf_filestream.appendPagesFromReader(original_pdf)
 
     original_pdf_id = original_pdf.trailer.get('/ID')
-    logger.debug('original_pdf_id=%s', original_pdf_id)
     if original_pdf_id:
         new_pdf_filestream._ID = original_pdf_id
         # else : generate some ?
@@ -1221,7 +1118,4 @@ def generate_from_file(
         elif file_type == 'file':
             new_pdf_filestream.write(pdf_file)
     end_chrono = datetime.now()
-    logger.info(
-        '%s PDF generated in %s seconds',
-        flavor, (end_chrono - start_chrono).total_seconds())
     return True
