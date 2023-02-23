@@ -105,9 +105,9 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
     """
     if not xml:
         raise ValueError('Missing xml argument')
-    if not isinstance(flavor, (str, unicode)):
+    if not isinstance(flavor, (str, bytes)):
         raise ValueError('Wrong type for flavor argument')
-    if not isinstance(level, (type(None), str, unicode)):
+    if not isinstance(level, (type(None), str, bytes)):
         raise ValueError('Wrong type for level argument')
     xml_etree = None
     if isinstance(xml, (str, bytes)):
@@ -119,10 +119,8 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
         xml_bytes = etree.tostring(
             xml, pretty_print=True, encoding='UTF-8',
             xml_declaration=True)
-    elif isinstance(xml, file):
-        xml.seek(0)
-        xml_bytes = xml.read()
-        xml.close()
+    elif isinstance(xml, bytes):
+        xml_string = xml
 
     # autodetect
     if flavor not in ('factur-x', 'facturx', 'zugferd', 'order-x', 'orderx'):
@@ -131,7 +129,7 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
                 xml_etree = etree.fromstring(xml_bytes)
             except Exception as e:
                 raise Exception(
-                    "The XML syntax is invalid: %s." % unicode(e))
+                    "The XML syntax is invalid: %s." % str(e))
         flavor = get_flavor(xml_etree)
     if flavor in ('factur-x', 'facturx'):
         if level not in FACTURX_LEVEL2xsd:
@@ -140,7 +138,7 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
                     xml_etree = etree.fromstring(xml_bytes)
                 except Exception as e:
                     raise Exception(
-                        "The XML syntax is invalid: %s." % unicode(e))
+                        "The XML syntax is invalid: %s." % str(e))
             level = get_level(xml_etree)
         if level not in FACTURX_LEVEL2xsd:
             raise ValueError(
@@ -157,7 +155,7 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
                     xml_etree = etree.fromstring(xml_bytes)
                 except Exception as e:
                     raise Exception(
-                        "The XML syntax is invalid: %s." % unicode(e))
+                        "The XML syntax is invalid: %s." % str(e))
             level = get_level(xml_etree)
         if level not in ORDERX_LEVEL2xsd:
             raise ValueError(
@@ -176,7 +174,7 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
             "The %s XML file is not valid against the official "
             "XML Schema Definition. "
             "Here is the error, which may give you an idea on the "
-            "cause of the problem: %s." % (flavor.capitalize(), unicode(e)))
+            "cause of the problem: %s." % (flavor.capitalize(), str(e)))
     return True
 
 
@@ -468,7 +466,6 @@ def _filespec_additional_attachments(
         params_dict[NameObject('/CreationDate')] = createStringObject(creation_date_pdf)
     file_entry = DecodedStreamObject()
     file_entry.setData(file_dict['filedata'])
-    file_entry = file_entry.flateEncode()
     file_mimetype = mimetypes.guess_type(filename)[0]
     if not file_mimetype:
         file_mimetype = 'application/octet-stream'
@@ -1087,7 +1084,7 @@ def generate_from_file(
     else:
         # clean-up pdf_metadata dict
         for key, value in pdf_metadata.items():
-            if not isinstance(value, (str, unicode)):
+            if not isinstance(value, (str, bytes)):
                 pdf_metadata[key] = ''
     original_pdf = PdfFileReader(pdf_file)
     # Extract /OutputIntents obj from original invoice
