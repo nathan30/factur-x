@@ -103,7 +103,7 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
     :return: True if the XML is valid against the XSD
     raise an error if it is not valid against the XSD
     """
-    if not xml:
+    if xml is None:
         raise ValueError('Missing xml argument')
     if not isinstance(flavor, (str, bytes)):
         raise ValueError('Wrong type for flavor argument')
