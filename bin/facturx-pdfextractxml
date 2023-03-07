@@ -5,7 +5,6 @@
 import argparse
 import sys
 from facturx import get_xml_from_pdf
-from facturx.facturx import logger
 import logging
 from os.path import isfile, isdir
 
@@ -23,23 +22,12 @@ def main(args):
             'warn': logging.WARN,
             'error': logging.ERROR,
         }
-        if log_level in log_map:
-            logger.setLevel(log_map[log_level])
-        else:
-            logger.error(
-                'Wrong value for log level (%s). Possible values: %s',
-                log_level, ', '.join(log_map.keys()))
-            sys.exit(1)
 
     pdf_filename = args.facturx_orderx_file
     out_xml_filename = args.xml_file_to_create
     if not isfile(pdf_filename):
-        logger.error('Argument %s is not a filename', pdf_filename)
         sys.exit(1)
     if isdir(out_xml_filename):
-        logger.error(
-            '2nd argument %s is a directory name (should be a the '
-            'output XML filename)', out_xml_filename)
         sys.exit(1)
     pdf_file = open(pdf_filename, 'rb')
     check_xsd = True
@@ -50,18 +38,12 @@ def main(args):
         (xml_filename, xml_string) = get_xml_from_pdf(
             pdf_file, check_xsd=check_xsd)
     except Exception as e:
-        logger.error(e)
         sys.exit(1)
     if xml_filename and xml_string:
-        if isfile(out_xml_filename):
-            logger.warning(
-                'File %s already exists. Overwriting it!', out_xml_filename)
         xml_file = open(out_xml_filename, 'wb')
         xml_file.write(xml_string)
         xml_file.close()
-        logger.info('File %s generated', out_xml_filename)
     else:
-        logger.warning('File %s has not been created', out_xml_filename)
         sys.exit(1)
 
 

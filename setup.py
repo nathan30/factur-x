@@ -14,11 +14,11 @@ else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE))
 
 setup(
-    name='factur-x',
+    name='factur-x-nolog',
     version=verstr,
     author='Alexis de Lattre',
     author_email='alexis.delattre@akretion.com',
-    url='https://github.com/akretion/factur-x',
+    url='https://github.com/kresys/factur-x',
     description='Factur-X and Order-X: electronic invoicing and ordering standards',
     long_description=open('README.rst').read(),
     license='BSD',
