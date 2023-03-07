@@ -33,9 +33,9 @@ from io import BytesIO
 from lxml import etree
 from tempfile import NamedTemporaryFile
 from datetime import datetime
-
-from pypdf import PdfReader, PdfWriter
-from pypdf.generic import DictionaryObject, DecodedStreamObject, NameObject, createStringObject, ArrayObject, IndirectObject
+from PyPDF4 import PdfFileWriter, PdfFileReader
+from PyPDF4.generic import DictionaryObject, DecodedStreamObject,\
+    NameObject, createStringObject, ArrayObject, IndirectObject
 from PyPDF4.utils import b_
 from pkg_resources import resource_filename
 import os.path
@@ -266,7 +266,7 @@ def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
     if not filenames:
         filenames = ALL_FILENAMES
     xml_bytes = xml_filename = False
-    pdf = PdfReader(pdf_file_in)
+    pdf = PdfFileReader(pdf_file_in)
     pdf_root = pdf.trailer['/Root']  # = Catalog
     catalog_name = _get_dict_entry(pdf_root, '/Names')
     if not catalog_name:
@@ -1086,10 +1086,10 @@ def generate_from_file(
         for key, value in pdf_metadata.items():
             if not isinstance(value, (str, bytes)):
                 pdf_metadata[key] = ''
-    original_pdf = PdfReader(pdf_file)
+    original_pdf = PdfFileReader(pdf_file)
     # Extract /OutputIntents obj from original invoice
     output_intents = _get_original_output_intents(original_pdf)
-    new_pdf_filestream = PdfWriter()
+    new_pdf_filestream = PdfFileWriter()
     new_pdf_filestream._header = b_("%PDF-1.6")
     new_pdf_filestream.appendPagesFromReader(original_pdf)
 
@@ -1116,3 +1116,4 @@ def generate_from_file(
             new_pdf_filestream.write(pdf_file)
     end_chrono = datetime.now()
     return True
+

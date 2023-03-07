@@ -18,7 +18,7 @@ setup(
     version=verstr,
     author='Alexis de Lattre',
     author_email='alexis.delattre@akretion.com',
-    url='https://github.com/kresys/factur-x',
+    url='https://github.com/nathan30/factur-x',
     description='Factur-X and Order-X: electronic invoicing and ordering standards',
     long_description=open('README.rst').read(),
     license='BSD',
