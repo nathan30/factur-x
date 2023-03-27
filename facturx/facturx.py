@@ -33,10 +33,9 @@ from io import BytesIO
 from lxml import etree
 from tempfile import NamedTemporaryFile
 from datetime import datetime
-from PyPDF4 import PdfFileWriter, PdfFileReader
-from PyPDF4.generic import DictionaryObject, DecodedStreamObject,\
+from pypdf import PdfWriter, PdfReader
+from pypdf.generic import DictionaryObject, DecodedStreamObject,\
     NameObject, createStringObject, ArrayObject, IndirectObject
-from PyPDF4.utils import b_
 from pkg_resources import resource_filename
 import os.path
 import mimetypes
@@ -103,8 +102,6 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
     :return: True if the XML is valid against the XSD
     raise an error if it is not valid against the XSD
     """
-    if xml is None:
-        raise ValueError('Missing xml argument')
     if not isinstance(flavor, (str, bytes)):
         raise ValueError('Wrong type for flavor argument')
     if not isinstance(level, (type(None), str, bytes)):
@@ -119,8 +116,15 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
         xml_bytes = etree.tostring(
             xml, pretty_print=True, encoding='UTF-8',
             xml_declaration=True)
-    elif isinstance(xml, bytes):
-        xml_string = xml
+    elif isinstance(xml, file):
+        xml.seek(0)
+        xml_bytes = xml.read()
+        xml.close()
+    else:
+        raise ValueError('Wrong type for xml argument')
+
+    if not xml_bytes:
+        raise ValueError('xml argument is empty')
 
     # autodetect
     if flavor not in ('factur-x', 'facturx', 'zugferd', 'order-x', 'orderx'):
@@ -185,7 +189,7 @@ def _get_dict_entry(node, entry):
     if isinstance(dict_entry, dict):
         return dict_entry
     elif isinstance(dict_entry, IndirectObject):
-        res_dict_entry = dict_entry.getObject()
+        res_dict_entry = dict_entry.get_object()
         if isinstance(res_dict_entry, dict):
             return res_dict_entry
         else:
@@ -203,7 +207,7 @@ def _parse_embeddedfiles_kids_node(kids_node, level, res):
         if not isinstance(kid_entry, IndirectObject):
 
             return False
-        kids_node = kid_entry.getObject()
+        kids_node = kid_entry.get_object()
         if not isinstance(kids_node, dict):
             return False
         if '/Names' in kids_node:
@@ -266,7 +270,8 @@ def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
     if not filenames:
         filenames = ALL_FILENAMES
     xml_bytes = xml_filename = False
-    pdf = PdfFileReader(pdf_file_in)
+    # pdf = PdfFileReader(pdf_file_in)
+    pdf = PdfReader(pdf_file_in)
     pdf_root = pdf.trailer['/Root']  # = Catalog
     catalog_name = _get_dict_entry(pdf_root, '/Names')
     if not catalog_name:
@@ -281,8 +286,8 @@ def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
     try:
         for (filename, file_obj) in embeddedfiles_by_two:
             if filename in filenames:
-                xml_file_dict = file_obj.getObject()
-                tmp_xml_bytes = xml_file_dict['/EF']['/F'].getData()
+                xml_file_dict = file_obj.get_object()
+                tmp_xml_bytes = xml_file_dict['/EF']['/F'].get_data()
                 xml_root = etree.fromstring(tmp_xml_bytes)
                 if check_xsd:
                     flavor = 'autodetect'
@@ -431,8 +436,8 @@ def _prepare_pdf_metadata_xml(flavor, level, orderx_type, pdf_metadata):
         title=pdf_metadata.get('title', ''),
         author=pdf_metadata.get('author', ''),
         subject=pdf_metadata.get('subject', ''),
-        producer='PyPDF4',
-        creator_tool='factur-x python lib v%s by Alexis de Lattre' % __version__,
+        producer='pypdf',
+        creator_tool='factur-x-nolog python lib v%s by Nathan Cheval (fork of Alexis de Lattre works)' % __version__,
         timestamp=_get_metadata_timestamp(),
         urn=urn,
         documenttype=documenttype,
@@ -703,14 +708,24 @@ def get_level(xml_etree):
         "/ram:GuidelineSpecifiedDocumentContextParameter"
         "/ram:ID", namespaces=namespaces)
     if not doc_id_xpath:
+        # ZUGFeRD 1.0
+        doc_id_xpath = xml_etree.xpath(
+            "//rsm:SpecifiedExchangedDocumentContext"
+            "/ram:GuidelineSpecifiedDocumentContextParameter"
+            "/ram:ID", namespaces=namespaces)
+    if not doc_id_xpath:
         raise ValueError(
             "This XML is not a Factur-X nor Order-X XML because it misses the XML tag "
             "ExchangedDocumentContext/"
+            "GuidelineSpecifiedDocumentContextParameter/ID. It is not a ZUGFeRD 1.0 "
+            "XML either because it misses the XML tag "
+            "SpecifiedExchangedDocumentContext/"
             "GuidelineSpecifiedDocumentContextParameter/ID.")
     doc_id = doc_id_xpath[0].text
     level = doc_id.split(':')[-1]
     possible_values = dict(FACTURX_LEVEL2xsd)
     possible_values.update(ORDERX_LEVEL2xsd)
+    # ZUGFeRD 1.0 levels are the same as orderx
     if level not in possible_values:
         level = doc_id.split(':')[-2]
     if level not in possible_values:
@@ -760,9 +775,9 @@ def _get_original_output_intents(original_pdf):
         pdf_root = original_pdf.trailer['/Root']
         ori_output_intents = pdf_root['/OutputIntents']
         for ori_output_intent in ori_output_intents:
-            ori_output_intent_dict = ori_output_intent.getObject()
+            ori_output_intent_dict = ori_output_intent.get_object()
             dest_output_profile_dict =\
-                ori_output_intent_dict['/DestOutputProfile'].getObject()
+                ori_output_intent_dict['/DestOutputProfile'].get_object()
             output_intents.append(
                 (ori_output_intent_dict, dest_output_profile_dict))
     except Exception:
@@ -1089,8 +1104,8 @@ def generate_from_file(
     original_pdf = PdfFileReader(pdf_file)
     # Extract /OutputIntents obj from original invoice
     output_intents = _get_original_output_intents(original_pdf)
-    new_pdf_filestream = PdfFileWriter()
-    new_pdf_filestream._header = b_("%PDF-1.6")
+    new_pdf_filestream = PdfWriter()
+    # new_pdf_filestream._header = b_("%PDF-1.6")
     new_pdf_filestream.appendPagesFromReader(original_pdf)
 
     original_pdf_id = original_pdf.trailer.get('/ID')
@@ -1116,4 +1131,5 @@ def generate_from_file(
             new_pdf_filestream.write(pdf_file)
     end_chrono = datetime.now()
     return True
+
 

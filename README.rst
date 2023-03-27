@@ -89,6 +89,15 @@ Contributors
 Changelog
 =========
 
+* Version 2.5 dated 2023-03-24
+
+  * Add support for ZUGFeRD 1.0 in get_level()
+  * xml_check_xsd(): avoid warning *Use specific 'len(elem)' or 'elem is not None' test instead.*
+
+* Version 2.4 dated 2023-03-13
+
+  * Update Factur-X XSD of all profiles to version 1.0.6
+
 * Version 2.3 dated 2021-04-12
 
   * Fix wrong flavor argument passed by generate_facturx_from_file() to generate_from_file()
