@@ -34,7 +34,7 @@ from lxml import etree
 from tempfile import NamedTemporaryFile
 from datetime import datetime
 from pypdf import PdfWriter, PdfReader
-from pypdf.generic import DictionaryObject, DecodedStreamObject,\
+from pypdf.generic import DictionaryObject, DecodedStreamObject, \
     NameObject, createStringObject, ArrayObject, IndirectObject
 from pkg_resources import resource_filename
 import os.path
@@ -64,20 +64,20 @@ ORDERX_LEVEL2xsd = {
     'basic': 'orderx-basic/SCRDMCCBDACIOMessageStructure_100pD20B.xsd',
     'comfort': 'orderx-comfort/SCRDMCCBDACIOMessageStructure_100pD20B.xsd',
     'extended': 'orderx-extended/SCRDMCCBDACIOMessageStructure_100pD20B.xsd',
-    }
+}
 FACTURX_LEVEL2xmp = {
     'minimum': 'MINIMUM',
     'basicwl': 'BASIC WL',
     'basic': 'BASIC',
     'en16931': 'EN 16931',
     'extended': 'EXTENDED',
-    }
+}
 ORDERX_TYPES = ('order', 'order_change', 'order_response')
 ORDERX_code2type = {
     '220': 'order',
     '230': 'order_change',
     '231': 'order_response',
-    }
+}
 XML_AFRelationship = ('data', 'source', 'alternative')
 ATTACHMENTS_AFRelationship = ('supplement', 'unspecified')
 
@@ -102,6 +102,8 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
     :return: True if the XML is valid against the XSD
     raise an error if it is not valid against the XSD
     """
+    if xml is None:
+        raise ValueError('Missing xml argument')
     if not isinstance(flavor, (str, bytes)):
         raise ValueError('Wrong type for flavor argument')
     if not isinstance(level, (type(None), str, bytes)):
@@ -116,15 +118,8 @@ def xml_check_xsd(xml, flavor='autodetect', level='autodetect'):
         xml_bytes = etree.tostring(
             xml, pretty_print=True, encoding='UTF-8',
             xml_declaration=True)
-    elif isinstance(xml, file):
-        xml.seek(0)
-        xml_bytes = xml.read()
-        xml.close()
-    else:
-        raise ValueError('Wrong type for xml argument')
-
-    if not xml_bytes:
-        raise ValueError('xml argument is empty')
+    elif isinstance(xml, bytes):
+        xml_string = xml
 
     # autodetect
     if flavor not in ('factur-x', 'facturx', 'zugferd', 'order-x', 'orderx'):
@@ -270,7 +265,6 @@ def get_xml_from_pdf(pdf_file, check_xsd=True, filenames=[]):
     if not filenames:
         filenames = ALL_FILENAMES
     xml_bytes = xml_filename = False
-    # pdf = PdfFileReader(pdf_file_in)
     pdf = PdfReader(pdf_file_in)
     pdf_root = pdf.trailer['/Root']  # = Catalog
     catalog_name = _get_dict_entry(pdf_root, '/Names')
@@ -330,12 +324,12 @@ def _prepare_pdf_metadata_txt(pdf_metadata):
         '/Author': pdf_metadata.get('author', ''),
         '/CreationDate': pdf_date,
         '/Creator':
-        'factur-x Python lib v%s by Alexis de Lattre' % __version__,
+            'factur-x Python lib v%s by Alexis de Lattre' % __version__,
         '/Keywords': pdf_metadata.get('keywords', ''),
         '/ModDate': pdf_date,
         '/Subject': pdf_metadata.get('subject', ''),
         '/Title': pdf_metadata.get('title', ''),
-        }
+    }
     return info_dict
 
 
@@ -436,8 +430,8 @@ def _prepare_pdf_metadata_xml(flavor, level, orderx_type, pdf_metadata):
         title=pdf_metadata.get('title', ''),
         author=pdf_metadata.get('author', ''),
         subject=pdf_metadata.get('subject', ''),
-        producer='pypdf',
-        creator_tool='factur-x-nolog python lib v%s by Nathan Cheval (fork of Alexis de Lattre works)' % __version__,
+        producer='PyPDF4',
+        creator_tool='factur-x python lib v%s by Alexis de Lattre' % __version__,
         timestamp=_get_metadata_timestamp(),
         urn=urn,
         documenttype=documenttype,
@@ -461,7 +455,7 @@ def _filespec_additional_attachments(
     params_dict = DictionaryObject({
         NameObject('/CheckSum'): md5sum_obj,
         NameObject('/Size'): NameObject(str(len(file_dict['filedata']))),
-        })
+    })
     # creation date and modification date are optional
     if isinstance(file_dict.get('modification_datetime'), datetime):
         mod_date_pdf = _get_pdf_timestamp(file_dict['modification_datetime'])
@@ -470,7 +464,7 @@ def _filespec_additional_attachments(
         creation_date_pdf = _get_pdf_timestamp(file_dict['creation_datetime'])
         params_dict[NameObject('/CreationDate')] = createStringObject(creation_date_pdf)
     file_entry = DecodedStreamObject()
-    file_entry.setData(file_dict['filedata'])
+    file_entry.set_data(file_dict['filedata'])
     file_mimetype = mimetypes.guess_type(filename)[0]
     if not file_mimetype:
         file_mimetype = 'application/octet-stream'
@@ -479,11 +473,11 @@ def _filespec_additional_attachments(
         NameObject("/Type"): NameObject("/EmbeddedFile"),
         NameObject("/Params"): params_dict,
         NameObject("/Subtype"): NameObject(file_mimetype_insert),
-        })
-    file_entry_obj = pdf_filestream._addObject(file_entry)
+    })
+    file_entry_obj = pdf_filestream._add_object(file_entry)
     ef_dict = DictionaryObject({
         NameObject("/F"): file_entry_obj,
-        })
+    })
     fname_obj = createStringObject(filename)
     afrelationship = file_dict.get('afrelationship')
     if afrelationship not in ATTACHMENTS_AFRelationship:
@@ -495,8 +489,8 @@ def _filespec_additional_attachments(
         NameObject("/F"): fname_obj,
         NameObject("/EF"): ef_dict,
         NameObject("/UF"): fname_obj,
-        })
-    filespec_obj = pdf_filestream._addObject(filespec_dict)
+    })
+    filespec_obj = pdf_filestream._add_object(filespec_dict)
     name_arrayobj_cdict[fname_obj] = filespec_obj
 
 
@@ -523,22 +517,22 @@ def _facturx_update_metadata_add_attachment(
         NameObject('/CheckSum'): md5sum_obj,
         NameObject('/ModDate'): createStringObject(_get_pdf_timestamp()),
         NameObject('/Size'): NameObject(str(len(xml_bytes))),
-        })
+    })
     file_entry = DecodedStreamObject()
-    file_entry.setData(xml_bytes)  # here we integrate the file itself
-    file_entry = file_entry.flateEncode()
+    file_entry.set_data(xml_bytes)  # here we integrate the file itself
+    file_entry = file_entry.flate_encode()
     file_entry.update({
         NameObject("/Type"): NameObject("/EmbeddedFile"),
         NameObject("/Params"): params_dict,
         # 2F is '/' in hexadecimal
         NameObject("/Subtype"): NameObject("/text#2Fxml"),
-        })
-    file_entry_obj = pdf_filestream._addObject(file_entry)
+    })
+    file_entry_obj = pdf_filestream._add_object(file_entry)
     # The Filespec entry
     ef_dict = DictionaryObject({
         NameObject("/F"): file_entry_obj,
         NameObject('/UF'): file_entry_obj,
-        })
+    })
 
     if flavor == 'order-x':
         xml_filename = ORDERX_FILENAME
@@ -555,8 +549,8 @@ def _facturx_update_metadata_add_attachment(
         NameObject("/F"): fname_obj,
         NameObject("/EF"): ef_dict,
         NameObject("/UF"): fname_obj,
-        })
-    filespec_obj = pdf_filestream._addObject(filespec_dict)
+    })
+    filespec_obj = pdf_filestream._add_object(filespec_dict)
     name_arrayobj_cdict = {fname_obj: filespec_obj}
     for attach_filename, attach_dict in additional_attachments.items():
         _filespec_additional_attachments(
@@ -570,52 +564,52 @@ def _facturx_update_metadata_add_attachment(
         af_list.append(filespec_obj)
     embedded_files_names_dict = DictionaryObject({
         NameObject("/Names"): ArrayObject(name_arrayobj_content_final),
-        })
+    })
     # Then create the entry for the root, as it needs a
     # reference to the Filespec
     embedded_files_dict = DictionaryObject({
         NameObject("/EmbeddedFiles"): embedded_files_names_dict,
-        })
+    })
     res_output_intents = []
     for output_intent_dict, dest_output_profile_dict in output_intents:
-        dest_output_profile_obj = pdf_filestream._addObject(
+        dest_output_profile_obj = pdf_filestream._add_object(
             dest_output_profile_dict)
         # TODO detect if there are no other objects in output_intent_dest_obj
         # than /DestOutputProfile
         output_intent_dict.update({
             NameObject("/DestOutputProfile"): dest_output_profile_obj,
-            })
-        output_intent_obj = pdf_filestream._addObject(output_intent_dict)
+        })
+        output_intent_obj = pdf_filestream._add_object(output_intent_dict)
         res_output_intents.append(output_intent_obj)
     # Update the root
     metadata_xml_bytes = _prepare_pdf_metadata_xml(
         flavor, level, orderx_type, pdf_metadata)
     metadata_file_entry = DecodedStreamObject()
-    metadata_file_entry.setData(metadata_xml_bytes)
-    metadata_file_entry = metadata_file_entry.flateEncode()
+    metadata_file_entry.set_data(metadata_xml_bytes)
+    metadata_file_entry = metadata_file_entry.flate_encode()
     metadata_file_entry.update({
         NameObject('/Subtype'): NameObject('/XML'),
         NameObject('/Type'): NameObject('/Metadata'),
-        })
-    metadata_obj = pdf_filestream._addObject(metadata_file_entry)
-    af_value_obj = pdf_filestream._addObject(ArrayObject(af_list))
+    })
+    metadata_obj = pdf_filestream._add_object(metadata_file_entry)
+    af_value_obj = pdf_filestream._add_object(ArrayObject(af_list))
     pdf_filestream._root_object.update({
         NameObject("/AF"): af_value_obj,
         NameObject("/Metadata"): metadata_obj,
         NameObject("/Names"): embedded_files_dict,
         # show attachments when opening PDF
         NameObject("/PageMode"): NameObject("/UseAttachments"),
-        })
+    })
     if lang:
         pdf_filestream._root_object.update({
             NameObject("/Lang"): createStringObject(lang.replace('_', '-')),
-            })
+        })
     if res_output_intents:
         pdf_filestream._root_object.update({
             NameObject("/OutputIntents"): ArrayObject(res_output_intents),
         })
     metadata_txt_dict = _prepare_pdf_metadata_txt(pdf_metadata)
-    pdf_filestream.addMetadata(metadata_txt_dict)
+    pdf_filestream.add_metadata(metadata_txt_dict)
 
 
 def _extract_base_info(facturx_xml_etree):
@@ -628,7 +622,7 @@ def _extract_base_info(facturx_xml_etree):
     format_map = {
         '102': '%Y%m%d',
         '203': '%Y%m%d%H%M',
-        }
+    }
     date_dt = datetime.strptime(date, format_map.get(date_format, format_map['102']))
     number_xpath = facturx_xml_etree.xpath(
         '//rsm:ExchangedDocument/ram:ID', namespaces=namespaces)
@@ -651,7 +645,7 @@ def _extract_base_info(facturx_xml_etree):
         'number': number,
         'date': date_dt,
         'doc_type': doc_type,
-        }
+    }
     return base_info
 
 
@@ -662,7 +656,7 @@ def _base_info2pdf_metadata(base_info):
         '231': 'Order Response',
         '380': 'Invoice',
         '381': 'Refund',
-        }
+    }
     doc_type_name = doc_type_map.get(base_info['doc_type'], 'Invoice')
     date_str = datetime.strftime(base_info['date'], '%Y-%m-%d')
     if base_info['doc_type'] == '231':
@@ -691,7 +685,7 @@ def _base_info2pdf_metadata(base_info):
         'keywords': '%s, %s' % (doc_type_name, doc_x),
         'title': title,
         'subject': subject,
-        }
+    }
     return pdf_metadata
 
 
@@ -708,24 +702,14 @@ def get_level(xml_etree):
         "/ram:GuidelineSpecifiedDocumentContextParameter"
         "/ram:ID", namespaces=namespaces)
     if not doc_id_xpath:
-        # ZUGFeRD 1.0
-        doc_id_xpath = xml_etree.xpath(
-            "//rsm:SpecifiedExchangedDocumentContext"
-            "/ram:GuidelineSpecifiedDocumentContextParameter"
-            "/ram:ID", namespaces=namespaces)
-    if not doc_id_xpath:
         raise ValueError(
             "This XML is not a Factur-X nor Order-X XML because it misses the XML tag "
             "ExchangedDocumentContext/"
-            "GuidelineSpecifiedDocumentContextParameter/ID. It is not a ZUGFeRD 1.0 "
-            "XML either because it misses the XML tag "
-            "SpecifiedExchangedDocumentContext/"
             "GuidelineSpecifiedDocumentContextParameter/ID.")
     doc_id = doc_id_xpath[0].text
     level = doc_id.split(':')[-1]
     possible_values = dict(FACTURX_LEVEL2xsd)
     possible_values.update(ORDERX_LEVEL2xsd)
-    # ZUGFeRD 1.0 levels are the same as orderx
     if level not in possible_values:
         level = doc_id.split(':')[-2]
     if level not in possible_values:
@@ -776,7 +760,7 @@ def _get_original_output_intents(original_pdf):
         ori_output_intents = pdf_root['/OutputIntents']
         for ori_output_intent in ori_output_intents:
             ori_output_intent_dict = ori_output_intent.get_object()
-            dest_output_profile_dict =\
+            dest_output_profile_dict = \
                 ori_output_intent_dict['/DestOutputProfile'].get_object()
             output_intents.append(
                 (ori_output_intent_dict, dest_output_profile_dict))
@@ -962,7 +946,6 @@ def generate_from_file(
     unless if the argument output_pdf_file is set.
     :rtype: bool
     """
-    start_chrono = datetime.now()
     if not pdf_file:
         raise ValueError('Missing pdf_file argument')
     if not xml:
@@ -1001,7 +984,7 @@ def generate_from_file(
     flavor_fix_mapping = {
         'orderx': 'order-x',
         'facturx': 'factur-x',
-        }
+    }
     flavor = flavor_fix_mapping.get(flavor, flavor)
     level = level.lower().replace(' ', '')
     if orderx_type:
@@ -1101,12 +1084,11 @@ def generate_from_file(
         for key, value in pdf_metadata.items():
             if not isinstance(value, (str, bytes)):
                 pdf_metadata[key] = ''
-    original_pdf = PdfFileReader(pdf_file)
+    original_pdf = PdfReader(pdf_file)
     # Extract /OutputIntents obj from original invoice
     output_intents = _get_original_output_intents(original_pdf)
     new_pdf_filestream = PdfWriter()
-    # new_pdf_filestream._header = b_("%PDF-1.6")
-    new_pdf_filestream.appendPagesFromReader(original_pdf)
+    new_pdf_filestream.append_pages_from_reader(original_pdf)
 
     original_pdf_id = original_pdf.trailer.get('/ID')
     if original_pdf_id:
@@ -1129,7 +1111,4 @@ def generate_from_file(
                 f.close()
         elif file_type == 'file':
             new_pdf_filestream.write(pdf_file)
-    end_chrono = datetime.now()
     return True
-
-
