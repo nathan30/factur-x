@@ -35,7 +35,7 @@ from tempfile import NamedTemporaryFile
 from datetime import datetime
 from pypdf import PdfWriter, PdfReader
 from pypdf.generic import DictionaryObject, DecodedStreamObject, \
-    NameObject, createStringObject, ArrayObject, IndirectObject
+    NameObject, create_string_object, ArrayObject, IndirectObject
 from pkg_resources import resource_filename
 import os.path
 import mimetypes
@@ -451,7 +451,7 @@ def _prepare_pdf_metadata_xml(flavor, level, orderx_type, pdf_metadata):
 def _filespec_additional_attachments(
         pdf_filestream, name_arrayobj_cdict, file_dict, filename):
     md5sum = hashlib.md5(file_dict['filedata']).hexdigest()
-    md5sum_obj = createStringObject(md5sum)
+    md5sum_obj = create_string_object(md5sum)
     params_dict = DictionaryObject({
         NameObject('/CheckSum'): md5sum_obj,
         NameObject('/Size'): NameObject(str(len(file_dict['filedata']))),
@@ -459,10 +459,10 @@ def _filespec_additional_attachments(
     # creation date and modification date are optional
     if isinstance(file_dict.get('modification_datetime'), datetime):
         mod_date_pdf = _get_pdf_timestamp(file_dict['modification_datetime'])
-        params_dict[NameObject('/ModDate')] = createStringObject(mod_date_pdf)
+        params_dict[NameObject('/ModDate')] = create_string_object(mod_date_pdf)
     if isinstance(file_dict.get('creation_datetime'), datetime):
         creation_date_pdf = _get_pdf_timestamp(file_dict['creation_datetime'])
-        params_dict[NameObject('/CreationDate')] = createStringObject(creation_date_pdf)
+        params_dict[NameObject('/CreationDate')] = create_string_object(creation_date_pdf)
     file_entry = DecodedStreamObject()
     file_entry.set_data(file_dict['filedata'])
     file_mimetype = mimetypes.guess_type(filename)[0]
@@ -478,13 +478,13 @@ def _filespec_additional_attachments(
     ef_dict = DictionaryObject({
         NameObject("/F"): file_entry_obj,
     })
-    fname_obj = createStringObject(filename)
+    fname_obj = create_string_object(filename)
     afrelationship = file_dict.get('afrelationship')
     if afrelationship not in ATTACHMENTS_AFRelationship:
         afrelationship = 'unspecified'
     filespec_dict = DictionaryObject({
         NameObject("/AFRelationship"): NameObject("/%s" % afrelationship.capitalize()),
-        NameObject("/Desc"): createStringObject(file_dict.get('description', '')),
+        NameObject("/Desc"): create_string_object(file_dict.get('description', '')),
         NameObject("/Type"): NameObject("/Filespec"),
         NameObject("/F"): fname_obj,
         NameObject("/EF"): ef_dict,
@@ -512,10 +512,10 @@ def _facturx_update_metadata_add_attachment(
             "Wrong value for afrelationship (%s). Possible values: %s."
             % (afrelationship, XML_AFRelationship))
     md5sum = hashlib.md5(xml_bytes).hexdigest()
-    md5sum_obj = createStringObject(md5sum)
+    md5sum_obj = create_string_object(md5sum)
     params_dict = DictionaryObject({
         NameObject('/CheckSum'): md5sum_obj,
-        NameObject('/ModDate'): createStringObject(_get_pdf_timestamp()),
+        NameObject('/ModDate'): create_string_object(_get_pdf_timestamp()),
         NameObject('/Size'): NameObject(str(len(xml_bytes))),
     })
     file_entry = DecodedStreamObject()
@@ -541,10 +541,10 @@ def _facturx_update_metadata_add_attachment(
         xml_filename = FACTURX_FILENAME
         desc = 'Factur-X XML file'
 
-    fname_obj = createStringObject(xml_filename)
+    fname_obj = create_string_object(xml_filename)
     filespec_dict = DictionaryObject({
         NameObject("/AFRelationship"): NameObject("/%s" % afrelationship.capitalize()),
-        NameObject("/Desc"): createStringObject(desc),
+        NameObject("/Desc"): create_string_object(desc),
         NameObject("/Type"): NameObject("/Filespec"),
         NameObject("/F"): fname_obj,
         NameObject("/EF"): ef_dict,
@@ -602,7 +602,7 @@ def _facturx_update_metadata_add_attachment(
     })
     if lang:
         pdf_filestream._root_object.update({
-            NameObject("/Lang"): createStringObject(lang.replace('_', '-')),
+            NameObject("/Lang"): create_string_object(lang.replace('_', '-')),
         })
     if res_output_intents:
         pdf_filestream._root_object.update({
