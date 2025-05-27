@@ -89,6 +89,45 @@ Contributors
 Changelog
 =========
 
+**WARNING** Since release 3.2/3.3, the command line tools (facturx-pdfextractxml, facturx-pdfgen, facturx-xmlcheck, facturx-webservice) are not packaged with the lib any more, because I haven't found how to make it work with pyproject.toml. Help appreciated.
+
+* Version 3.6 dated 2024-12-14
+
+  * Fix regression for order-x and zugferd caused by change to support absolute namespace declaration
+  * Add new method get_xml_namespaces(flavor)
+
+* Version 3.5 dated 2024-12-14
+
+  * Fix dependency declaration in python package
+  * Fix packaging of scripts (was broken since the move from setup.py to pyproject.toml)
+  * Add support for absolute namespace declaration in XML file
+
+* Version 3.4 dated 2024-12-04
+
+  * Fix minimum python version: 3.7 (was 3.6) because importlib.resources was added in python 3.7
+
+* Version 3.3 dated 2024-12-02
+
+  * Migrate packaging from setup.py to pyproject.toml
+  * Version is now stored in pyproject.toml and python code use it
+
+* Version 3.2 dated 2024-12-02
+
+  * Update to Factur-X XSD version 1.0.7.2 (equivalent to ZUGFeRD 2.3)
+  * Don't set flavor autodetection when file is zugferd-invoice.xml (fixes bug #41)
+
+* Version 3.1 dated 2023-08-13
+
+  * Keep bookmarks, annotations, etc. from input PDF file. For that, we use the method clone_document_from_reader() of pypdf instead of append_pages_from_reader()
+  * Fix bug on xml type parsing (bug introduced in version 3.0)
+  * raise explicit error when trying to generate a ZUGFeRD 1.x PDF invoice
+
+* Version 3.0 dated 2023-08-13
+
+  * Replace dependency on PyPDF4 by pypdf. The development focus is back on **pypdf** and the forks PyPDF2, PyPDF3 and PyPDF4 are not maintained any more, cf this `article <https://martinthoma.medium.com/pypdf-the-2022-review-8925dea750d9>`_.
+  * Remove support for Python 2.7
+  * In the scripts, replace /usr/bin/python3 by /usr/bin/env python
+
 * Version 2.5 dated 2023-03-24
 
   * Add support for ZUGFeRD 1.0 in get_level()
@@ -97,6 +136,7 @@ Changelog
 * Version 2.4 dated 2023-03-13
 
   * Update Factur-X XSD of all profiles to version 1.0.6
+  * Update Order-X XSD of all profiles to version 1.0.0
 
 * Version 2.3 dated 2021-04-12
 
