@@ -41,6 +41,7 @@ import mimetypes
 import hashlib
 import logging
 
+VERSION = '1.7.3'
 FACTURX_FILENAME = 'factur-x.xml'
 ZUGFERD_FILENAMES = ['zugferd-invoice.xml', 'ZUGFeRD-invoice.xml']
 ORDERX_FILENAME = 'order-x.xml'
